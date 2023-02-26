@@ -15,10 +15,11 @@ export class AttachmentUtils{
     getAttachmentUrl(todoId: string){
         return `https://${this.bucketName}.s3amazonaws.com/${todoId}`
     }
-    getUploadUrl(todoId: string): string{
+    getUploadUrl(todoId: string){
+        console.log('getUploadUrl called')
         const url = this.s3.getSignedUrl('putObject',{
             Bucket: this.bucketName,
-            key: todoId,
+            Key: todoId,
             Expires: urlExpiration
         })
         return url as string
