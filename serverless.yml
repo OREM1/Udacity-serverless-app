@@ -2,13 +2,11 @@ org: paulmolla
 app: serverless-todo-app
 service: serverless-todo-app
 
-
 plugins:
   - serverless-webpack
   - serverless-iam-roles-per-function
   - serverless-reqvalidator-plugin
   - serverless-aws-documentation
-  - serverless-plugin-tracing
 
 provider:
   name: aws
@@ -23,13 +21,16 @@ provider:
 
   environment:
     PROJECT_NAME: udacity-p5
-    #TODOS_CREATED_AT_INDEX: CreatedAtIndex
     TODOS_TABLE: udacity-p5-serverless-application-todo-${self:provider.stage}
-    ATTACHMENT_S3_BUCKET_NAME: udacity-p5-serverless-application-todo-${self:provider.stage}
-    #INDEX_NAME: ${self:provider.environment.TODOS_CREATED_AT_INDEX}
-    SIGNED_URL_EXPIRATION: 300
-
-
+    S3_BUCKET_NAME: udacity-p5-serverless-application-todo-${self:provider.stage}
+  
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - xray:PutTelementryRecords
+          Resource: "*"
 
 custom:
   documentation:
@@ -40,14 +41,15 @@ custom:
         description: serverless-application-todo-api
     models:
       - name: CreateTodoRequest
-        contentType: application/json
+        contentType: "application/json"
         schema: ${file(models/create-todo-model.json)}
       - name: UpdateTodoRequest
-        contentType: application/json
+        contentType: "application/json"
         schema: ${file(models/update-todo-model.json)}
           
+           
 functions:
-  
+
   Auth:
     handler: src/lambda/auth/auth0Authorizer.handler
 
@@ -66,12 +68,10 @@ functions:
       - Effect: Allow
         Action:
           - dynamodb:Query
-          - xray:PutTraceSegments
         Resource: arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.TODOS_TABLE}
       - Effect: Allow
         Action:
           - xray:PutTraceSegments
-          - dynamodb:Query
         Resource: 
           - '*'
 
@@ -85,12 +85,12 @@ functions:
           path: todos
           cors: true
           authorizer: Auth
+          documentation:
+            summary: "Create a new todo item"
+            description: "Create a new todo item"
+            requestModels:
+              "application/json": CreateTodoRequest
           reqValidatorName: RequestBodyValidator
-          #documentation:
-           #  summary: Create a new to do task
-            # description: Create a new to do task
-             #requestModels:
-              # 'application/json': createTodoRequest
     iamRoleStatementsName: ${self:provider.environment.PROJECT_NAME}-create-todo-role-${self:provider.stage}
     iamRoleStatements:
       - Effect: Allow
@@ -100,7 +100,6 @@ functions:
       - Effect: Allow
         Action:
           - xray:PutTraceSegments
-          - dynamodb:PutItem
         Resource: 
           - '*'
 
@@ -113,12 +112,12 @@ functions:
           path: todos/{todoId}
           cors: true
           authorizer: Auth
+          documentation:
+            summary: "Update a todo item"
+            description: "Update a todo item"
+            requestModels:
+              "application/json": UpdateTodoRequest
           reqValidatorName: RequestBodyValidator
-          #documentation:
-           # summary: Update a newto do task
-            #description: Update todo task
-            #requestModels:
-             #  'application/json': UpdateTodoRequest
     iamRoleStatementsName: ${self:provider.environment.PROJECT_NAME}-update-todo-role-${self:provider.stage}
     iamRoleStatements:
       - Effect: Allow
@@ -128,7 +127,6 @@ functions:
       - Effect: Allow
         Action:
           - xray:PutTraceSegments
-          - dynamodb:PutItem
         Resource: 
           - '*'
 
@@ -151,7 +149,6 @@ functions:
       - Effect: Allow
         Action:
           - xray:PutTraceSegments
-          - dynamodb:DeleteItem
         Resource: 
           - '*'
 
@@ -170,17 +167,18 @@ functions:
       - Effect: Allow
         Action:
           - s3:*
-        Resource: arn:aws:s3:::${self:provider.environment.ATTACHMENT_S3_BUCKET_NAME}/*
+          - xray:PutTraceSegments 
+        Resource: arn:aws:s3:::${self:provider.environment.S3_BUCKET_NAME}/*
       - Effect: Allow
         Action:
           - dynamodb:Query
+          - dynamodb:UpdateItem
           - dynamodb:PutItem
-        Resource: arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.TODOS_TABLE}     
+        Resource: arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.TODOS_TABLE}
       - Effect: Allow
         Action:
-          - xray:PutTraceSegments
-          - dynamodb:DeleteItem
-          - dynamodb:Query
+          - dynamodb:UpdateItem
+          -  xray:PutTraceSegments
         Resource:
           - '*'
 resources:
@@ -201,10 +199,10 @@ resources:
             KeyType: RANGE
         BillingMode: PAY_PER_REQUEST
         TableName: ${self:provider.environment.TODOS_TABLE}
-    RequestBodyValidator:
+    onlyBody:
       Type: "AWS::ApiGateway::RequestValidator"
       Properties:
-        Name: 'RequestBodyValidator'
+        Name: 'only-body'
         RestApiId:
           Ref: ApiGatewayRestApi
         ValidateRequestBody: true
@@ -212,7 +210,7 @@ resources:
     AttachmentsBucket:
       Type: AWS::S3::Bucket
       Properties:
-        BucketName: ${self:provider.environment.ATTACHMENT_S3_BUCKET_NAME}
+        BucketName: ${self:provider.environment.S3_BUCKET_NAME}
         CorsConfiguration:
           CorsRules:
             - AllowedOrigins:
@@ -226,16 +224,15 @@ resources:
                 - DELETE
                 - HEAD
               MaxAge: 300
-    BodyValidator:
+
+    RequestBodyValidator:
       Type: AWS::ApiGateway::RequestValidator
       Properties:
-        Name: 'request_body_validator'
+        Name: 'request-body-validator'
         RestApiId:
           Ref: ApiGatewayRestApi
         ValidateRequestBody: true
         ValidateRequestParameters: false
-
-    
 
     GatewayResponseDefault4XX:
       Type: AWS::ApiGateway::GatewayResponse
@@ -246,7 +243,7 @@ resources:
           gatewayresponse.header.Access-Control-Allow-Methods: "'*'"
         ResponseType: DEFAULT_4XX
         RestApiId:
-          Ref: ApiGatewayRestApi 
+          Ref: ApiGatewayRestApi
 
     GatewayResponseDefault5XX:
       Type: AWS::ApiGateway::GatewayResponse
@@ -258,6 +255,7 @@ resources:
         ResponseType: DEFAULT_5XX
         RestApiId:
           Ref: ApiGatewayRestApi 
+
     BucketPolicy:
       Type: AWS::S3::BucketPolicy
       Properties:
@@ -268,6 +266,6 @@ resources:
             - Sid: PublicReadForGetBucketObjects
               Effect: Allow
               Principal: '*'
-              Action: 's3:GetObject' 
-              Resource: 'arn:aws:s3:::${self:provider.environment.ATTACHMENT_S3_BUCKET_NAME}/*'
+              Action: 's3:GetObject'
+              Resource: 'arn:aws:s3:::${self:provider.environment.S3_BUCKET_NAME}/*'
         Bucket: !Ref AttachmentsBucket

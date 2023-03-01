@@ -4,8 +4,8 @@ import * as AWSXRay from 'aws-xray-sdk'
 const XAWS = AWSXRay.captureAWS(AWS)
 
 // TODO: Implement the fileStogare logic
-const s3BuketName =process.env.ATTACHMENTS_s3_BUCKET
-const urlExpiration = process.env.SIGNED_URL_EXPIRATION
+const s3BuketName =process.env.S3_BUCKET_NAME
+const urlExpiration=3000
 
 export class AttachmentUtils{
     constructor(
@@ -15,7 +15,7 @@ export class AttachmentUtils{
     getAttachmentUrl(todoId: string){
         return `https://${this.bucketName}.s3amazonaws.com/${todoId}`
     }
-    getUploadUrl(todoId: string){
+    getUploadUrl(todoId: string):string{
         console.log('getUploadUrl called')
         const url = this.s3.getSignedUrl('putObject',{
             Bucket: this.bucketName,

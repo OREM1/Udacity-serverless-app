@@ -2,12 +2,12 @@ import { ToDoAccess } from '../dataLayer/todosAcess'
 import { AttachmentUtils } from '../helpers/attachmentUtils';
 import { TodoItem } from '../models/TodoItem'
 import { CreateTodoRequest } from '../requests/CreateTodoRequest'
-//import { UpdateTodoRequest } from '../requests/UpdateTodoRequest'
 import { createLogger } from '../utils/logger'
 import * as uuid from 'uuid'
-//import { TodoUpdate } from '../../models/TodoUpdate';
 import { UpdateTodoRequest } from '../requests/UpdateTodoRequest';
 import { TodoUpdate } from '../models/TodoUpdate';
+//import { getUserId } from '../lambda/utils';
+import * as AWS from 'aws-sdk';
 //import { Logger } from 'winston';
 //import * as createError from 'http-errors'
 
@@ -43,9 +43,9 @@ export async function createToDo(
 }
 // write update function
 export async function updateTodo(
-    todoId,
+    todoId:string,
     todoUpdate:UpdateTodoRequest,
-    userId
+    userId:string
 ):Promise<TodoUpdate>{
     logger.info('Update todo function called')
     return await todosAcess.updateTodoItem(todoId,userId,todoUpdate)
@@ -53,21 +53,34 @@ export async function updateTodo(
 
 //write delete todo function
 export async function deleteTodo(
-    userId,
-    todoId,
+    todoId:string,
+    userId:string
 ):Promise<string>{
     logger.info('Delete todo function called')
     return todosAcess.deleteTodoItem(todoId,userId)
 }
 //Write generate upload url function
-export async function createAttachmentPresignedUrl(
-       todoId:string,
-       userId:string
+//export async function createAttachmentPresignedUrl(
+ //      todoId:string,
+ //      userId:string
+//):Promise<string>{
+  //  logger.info('Create attachment function called by user',userId,todoId)
+ //   return attachmentUtils.getUploadUrl(todoId)
+//}
+    
+export async function generateUploadUrl(
+    todoId:string,
+    userId:string
 ):Promise<string>{
-    logger.info('Create attachment function called by user',userId,todoId)
-    return attachmentUtils.getUploadUrl(todoId)
+ //const userId=getUserId(event);
+  const bucketName=process.env.S3_BUCKET_NAME;
+  const urlExpiration=3000;
+  const s3= new AWS.S3({signatureVersion:'v4'})
+  const signedUrl=s3.getSignedUrl('putObject',{
+    Bucket: bucketName,
+    Key: todoId, 
+    Expires: urlExpiration
+  });
+  await todosAcess.saveImgUrl(todoId,userId,bucketName);
+  return signedUrl
 }
-    
-
-
-    

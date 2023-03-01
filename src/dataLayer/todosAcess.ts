@@ -1,7 +1,6 @@
 import * as AWS from "aws-sdk";
 //import * as AWSXRay from 'aws-xray-sdk'
 import { DocumentClient } from "aws-sdk/clients/dynamodb";
-//import { Logger } from "winston";
 //import { Types } from 'aws-sdk/clients/s3';
 //import { Logger, loggers } from "winston";
 import { TodoItem } from "../models/TodoItem";
@@ -18,7 +17,7 @@ export class ToDoAccess {
        // private readonly s3Client: Types = new AWS.S3({ signatureVersion: 'v4' }),
         private readonly todoTable = process.env.TODOS_TABLE,
         private readonly todosIndex =process.env.INDEX_NAME,
-        //private //readonly s3BucketName = process.env.S3_BUCKET_NAME
+        //private readonly s3BucketName = process.env.S3_BUCKET_NAME
         ){}
 
     async getAllTodos(userId: string): Promise<TodoItem[]> {
@@ -28,7 +27,6 @@ export class ToDoAccess {
             TableName: this.todoTable,
             IndexName: this.todosIndex,
             KeyConditionExpression: 'userId=:userId',
-
             ExpressionAttributeValues: {
                 ':userId': userId
             }
@@ -57,10 +55,10 @@ export class ToDoAccess {
         todoId:string,
         userId:string,
         attachmentUrl:string 
-        ):Promise<void> {
-          await this.docClient
+    ):Promise<void> {
+             await this.docClient
           .update({
-            TableName:this.todoTable,
+            TableName: this.todoTable,
             Key:{
                 todoId,
                 userId
@@ -70,15 +68,16 @@ export class ToDoAccess {
                 ':attachmentUrl':attachmentUrl
               }
           })
+        
           .promise()
-           
+        
     }
     async updateTodoItem(
         todoId:string,
         userId:string,
         todoUpdate:TodoUpdate
     ):Promise<TodoUpdate>{
-       const result = await this.docClient
+       const result= await this.docClient
         .update({
             TableName: this.todoTable,
             Key:{
@@ -116,7 +115,27 @@ export class ToDoAccess {
         console.log('Delete todo item called',result)
         return todoId as string
        }
+
+
+       async  saveImgUrl(todoId:string,userId:string,bucketName:string):Promise<void> {
+        await this.docClient
+        .update({
+            TableName:this.todoTable,
+            Key:{
+                todoId,
+                userId
+            },
+            //ConditionExpression:'attribute_exits(todoId)',
+            UpdateExpression:'set attachmentUrl=:attachmentUrl',
+            ExpressionAttributeValues:{
+                ':attachmentUrl':`https:${bucketName}.s3.amazonaws.com/${todoId}`
+            }
+    
+        })
+        .promise(); 
+    
+    }   
+    
     }
 
-    
 
